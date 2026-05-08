@@ -1,0 +1,54 @@
+# =====================================================================
+# TiendaDB v1.0 — Docker Compose
+# E-commerce demo database for PgGuardian project (SIS2404)
+#
+# Usage:
+#   docker compose up -d           # Start the database
+#   docker compose logs -f db      # Watch the seeding progress
+#   docker compose down -v         # Stop and remove all data
+# =====================================================================
+
+services:
+  db:
+    image: postgres:16
+    container_name: tiendadb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tiendadb
+      POSTGRES_USER: tienda_user
+      POSTGRES_PASSWORD: tienda_pass
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      # Init scripts run in alphabetical order on first start
+      - ./init:/docker-entrypoint-initdb.d:ro
+      # Custom postgresql.conf with planted misconfigs (H13-H16)
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      # Data persistence
+      - tienda_data:/var/lib/postgresql/data
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tienda_user -d tiendadb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # H17: Long-running idle-in-transaction connection (planted problem)
+  idle_tx:
+    image: postgres:16
+    container_name: tiendadb_idle_tx
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts:ro
+    command: bash /scripts/start_idle_tx.sh
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+
+volumes:
+  tienda_data:
+    name: tiendadb_data

@@ -5,6 +5,7 @@ from psycopg2 import extensions
 from dotenv import load_dotenv
 import logging
 
+
 # Carga las variables de .env 
 load_dotenv()
 
@@ -38,11 +39,9 @@ class PgGuardianConnector:
                     connect_timeout=5
                 )
                 # Configuración de la conexión
-                self._target_conn.set_session(
-                    # Envía cada consulta de inmediato sin esperar COMMIT
-                    isolation_level=extensions.ISOLATION_LEVEL_AUTOCOMMIT,
-                    readonly=True
-                )
+                self._target_conn.autocommit = True
+                self._target_conn.set_session(readonly=True)
+
                 logger.info("Conexión establecida con la base de datos a auditar.")
             except psycopg2.Error as e:
                 logger.error(f"No se pudo conectar a la BD: {e.pgerror}")
@@ -91,3 +90,14 @@ class PgGuardianConnector:
 
 # Creamos un objeto
 db = PgGuardianConnector()
+
+# Interfaz para  Snapshot
+class DBAuditInterface:
+    def execute_query(self, sql):
+        # Verificar que la conexión esté activa para ejecutar la consulta
+        conn = db.connect_to_target()
+        # ejecucción de la consulta y retorno del resultado
+        return db.run_query(conn, sql)
+
+# objeto para usar en snapshot.py y poder ejecutar las consultas
+db_client = DBAuditInterface()

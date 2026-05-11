@@ -6,6 +6,7 @@
 #   docker compose up -d           # Start the database
 #   docker compose logs -f db      # Watch the seeding progress
 #   docker compose down -v         # Stop and remove all data
+
 # =====================================================================
 
 services:
@@ -52,3 +53,4 @@ services:
 volumes:
   tienda_data:
     name: tiendadb_data
+

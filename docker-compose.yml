@@ -1,0 +1,47 @@
+# Docker Compose raíz
+# TiendaDB  + PgGuardianDB + Backend
+
+include:
+  - tiendadb/docker-compose.yml    # importa tiendadb + idle_tx sin tocar nada
+
+services:
+
+  pgguardian-db:
+    image: postgres:16
+    container_name: pgguardian_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pgguardian
+      POSTGRES_USER: guardian_admin
+      POSTGRES_PASSWORD: pg_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./guardian_db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgguardian_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guardian_admin -d pgguardian"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: pgguardian_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      pgguardian-db:
+        condition: service_healthy
+    environment:
+      TARGET_DB_URI: postgresql://tienda_user:tienda_pass@db:5432/tiendadb
+      OWN_DB_URI: postgresql://guardian_admin:pg_pass@pgguardian-db:5432/pgguardian
+
+volumes:
+  pgguardian_data:
+    name: pgguardian_data

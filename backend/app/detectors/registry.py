@@ -1,7 +1,7 @@
 import logging
 
 from .indexes import ForeignKeyIndexDetector, UnusedIndexesDetector, DuplicateIndexesDetector
-#from .health import HealthDetector
+from .health import IdleInTransactionDetector, ActiveLocksDetector, ConnectionSpikeDetector
 
 # Configuración básica para ver qué está pasando en la terminal
 logging.basicConfig(level=logging.INFO)
@@ -15,7 +15,9 @@ class DetectorRegistry:
             ForeignKeyIndexDetector(),
             UnusedIndexesDetector(),
             DuplicateIndexesDetector(),
-            # HealthDetector() # Este es el que integra la parte de salud
+            IdleInTransactionDetector(),
+            ActiveLocksDetector(),
+            ConnectionSpikeDetector(),
         ]
 
     def run_all(self, snap_object):

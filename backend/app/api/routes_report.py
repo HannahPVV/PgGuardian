@@ -27,7 +27,7 @@ def get_snapshots():
 def get_report(snapshot_id: int):
     session = get_session()
     try:
-        # Aquí es donde verás tus 17 hallazgos detallados
+        # Hallazgos ordenados por severity
         findings = session.query(Finding).filter(
             Finding.snapshot_id == snapshot_id
         ).order_by(Finding.severity.desc()).all()

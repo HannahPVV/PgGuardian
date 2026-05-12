@@ -1,4 +1,4 @@
-from app.detectors.base import Detector
+from detectors.base import Detector
 
 
 class IdleInTransactionDetector(Detector):
@@ -17,21 +17,31 @@ class IdleInTransactionDetector(Detector):
         for conn in snap.connections:
             state = conn.get("state")
             seconds_idle = conn.get("seconds_idle") or 0
+            seconds_running = conn.get("seconds_running") or 0
             pid = conn.get("pid")
             user = conn.get("usename")
             query = conn.get("query") or ""
 
-            # Umbral sugerido: más de 5 minutos inactivo dentro de una transacción
-            if state == "idle in transaction" and seconds_idle > 300:
+            tiempo_formateado = f"{int(seconds_idle // 60)} minutos" if seconds_idle >= 60 else f"{int(seconds_idle)} segundos"
+          
+            if state == "idle in transaction":
+                if seconds_idle > 1800:
+                    severity = "high"
+                    title = "Transacción inactiva crítica — más de 30 minutos"
+                elif seconds_idle > 300:
+                    severity = "medium"
+                    title = "Transacción inactiva — más de 5 minutos"
+                else:
+                    continue         
                 issues.append(
                     self._add_issue(
                         code="HLT001",
-                        level="high",
-                        title="Transacción inactiva abierta por demasiado tiempo",
+                        level= severity,
+                        title=title,
                         desc=(
-                            f"La sesión PID {pid}, del usuario '{user}', lleva "
-                            f"{int(seconds_idle)} segundos en estado idle in transaction. "
-                            "Esto puede retener locks, bloquear mantenimiento y afectar el rendimiento."
+                            f"El PID {pid} (usuario '{user}') lleva {tiempo_formateado} "
+                            "inactivo dentro de una transacción abierta. Esto es peligroso "
+                            "porque puede retener locks y bloquear el mantenimiento (VACUUM)."
                         ),
                         table="",
                         sql_check=(
@@ -41,13 +51,37 @@ class IdleInTransactionDetector(Detector):
                             "WHERE state = 'idle in transaction';"
                         ),
                         sql_fix=(
-                            f"-- Revisar la sesión antes de terminarla\n"
                             f"SELECT pg_terminate_backend({pid});"
                         )
                     )
-                )
 
+                )
+            elif state == "active" and "pg_sleep" in query.lower():
+                # Aplicamos niveles según la duración de la query
+                if seconds_running > 1800: # 30 min
+                    severity = "high"
+                    title = "Sesión crítica bloqueada por pg_sleep"
+                elif seconds_running > 300: # 5 min
+                    severity = "medium"
+                    title = "Sesión prolongada detectada po pg_sleep"
+                else:
+                    continue # Menos de 5 min no se reporta
+
+                issues.append(
+                    self._add_issue(
+                        code="HLT001",
+                        level=severity,
+                        title=title,
+                        desc=(
+                            f"El PID {pid} está ejecutando un bloqueo vía pg_sleep por {int(seconds_running // 60)} min. "
+                        ),
+                        table="",
+                        sql_check=f"SELECT pid, query, now() - query_start FROM pg_stat_activity WHERE pid = {pid};",
+                        sql_fix=f"SELECT pg_terminate_backend({pid});"
+                    )
+                )
         return issues
+
 
 
 class ActiveLocksDetector(Detector):

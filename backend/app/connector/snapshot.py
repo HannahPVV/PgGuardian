@@ -95,9 +95,13 @@ def _get_active_sessions():
 # Conexión y actividad actual para detectar sesiones inactivas o bloqueos
     return db_client.execute_query("""
         SELECT pid, usename, state, 
-            EXTRACT(EPOCH FROM (now() - state_change)) AS seconds_idle, query
+            EXTRACT(EPOCH FROM (now() - state_change)) AS seconds_idle, 
+            EXTRACT(EPOCH FROM (now() - query_start)) AS seconds_running,
+            query
         FROM pg_stat_activity 
-        WHERE datname = current_database() AND state IS NOT NULL
+        WHERE state IS NOT NULL 
+          AND backend_type = 'client backend'  
+        ORDER BY state_change ASC;
     """)
 
 def _get_statement_stats():

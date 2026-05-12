@@ -1,5 +1,4 @@
-from app.detectors.base import Detector
-
+from detectors.base import Detector
 
 class ForeignKeyIndexDetector(Detector):
     

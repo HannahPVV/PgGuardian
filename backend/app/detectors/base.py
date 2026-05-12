@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from app.connector.snapshot import Snapshot
+from connector.snapshot import Snapshot
 
 class Detector(ABC):
     #Clase base para los detectores

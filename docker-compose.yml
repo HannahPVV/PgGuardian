@@ -15,7 +15,7 @@ services:
       POSTGRES_USER: guardian_admin
       POSTGRES_PASSWORD: pg_pass
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - ./guardian_db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - pgguardian_data:/var/lib/postgresql/data

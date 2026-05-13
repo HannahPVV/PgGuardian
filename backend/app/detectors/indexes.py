@@ -1,3 +1,5 @@
+from venv import logger
+
 from detectors.base import Detector
 
 class ForeignKeyIndexDetector(Detector):
@@ -55,48 +57,27 @@ class ForeignKeyIndexDetector(Detector):
 
 
 class UnusedIndexesDetector(Detector):
-    
-    #Detecta índices que nunca se usan.
-    
     category = "indexes"
 
     def run(self, snap):
-
         issues = []
-
-        constraint_names = {r["index_name"] for r in snap.constraint_indexes}
-
+        
         for idx in snap.indexes:
+            name = idx.get("index_name")
+            scans = idx.get("idx_scan", 0)
+            activity = idx.get("table_activity", 0)
 
-            index_name = idx["index_name"]
-            table_name = idx["table_name"]
-            scans = idx["idx_scan"]
 
-            if index_name in constraint_names:
-                continue
-
-            # Índice nunca usado
-            if scans == 0:
-
-                issues.append(
-                    self._add_issue(
-                        code="IDX002",
-                        level="medium",
-                        title="Índice nunca usado",
-                        desc=f"El índice '{index_name}' de la tabla "
-                             f"'{table_name}' no ha sido utilizado.",
-                        table=table_name,
-                        sql_check=f"""
-                            SELECT *
-                            FROM pg_stat_user_indexes
-                            WHERE indexrelname = '{index_name}';
-                        """,
-                        sql_fix=f"""
-                            DROP INDEX {index_name};
-                        """
-                    )
-                )
-
+            if scans == 0 and activity > 100:
+            
+                issues.append(self._add_issue(
+                    code="IDX002",
+                    level="medium",
+                    title="Índice nunca usado",
+                    desc=f"El índice '{name}' no registra uso mientras la tabla tiene actividad de más de 100 consultas y cero escaneos.",
+                    table=idx.get("table_name")
+                ))
+        
         return issues
 
 

@@ -87,11 +87,29 @@ def _get_autovacuum_disabled():
     """)     
 
 def _get_index_usage():
-#Monitorear cual es la frecuencia de uso de los índices
+    # Agregamos el NOT EXISTS para que no traiga PKs ni FKs
     return db_client.execute_query("""
-        SELECT schemaname, relname AS table_name, indexrelname AS index_name, 
-            idx_scan, idx_tup_read, idx_tup_fetch
-        FROM pg_stat_user_indexes
+        SELECT 
+            i.schemaname, i.relname AS table_name, i.indexrelname AS index_name, 
+            i.idx_scan, (t.seq_scan + t.idx_scan) AS table_activity 
+        FROM pg_stat_user_indexes i
+        JOIN pg_stat_user_tables t ON i.relid = t.relid
+        JOIN pg_index ix ON i.indexrelid = ix.indexrelid
+        WHERE i.schemaname = 'public'
+          AND i.idx_scan = 0 
+          -- FILTRO DINÁMICO CONTRA DUPLICADOS Y REGLAS
+          AND NOT EXISTS (
+              SELECT 1 
+              FROM pg_index ix2
+              WHERE ix2.indrelid = ix.indrelid    -- Misma tabla
+                AND ix2.indexrelid != ix.indexrelid -- Que no sea el mismo índice
+                AND ix2.indkey = ix.indkey        -- MISMAS COLUMNAS (Aquí se van el SKU y Category_id)
+          )
+          -- Filtro de integridad básico
+          AND ix.indisunique = false
+          AND ix.indisprimary = false
+          -- Filtro de actividad para quitar tablas pequeñas (como categories)
+          AND (t.seq_scan + t.idx_scan) > 1000
     """)
 
 def _get_index_definitions():

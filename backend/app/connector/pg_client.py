@@ -93,11 +93,11 @@ db = PgGuardianConnector()
 
 # Interfaz para  Snapshot
 class DBAuditInterface:
-    def execute_query(self, sql):
+    def execute_query(self, sql, params=None):
         # Verificar que la conexión esté activa para ejecutar la consulta
         conn = db.connect_to_target()
         # ejecucción de la consulta y retorno del resultado
-        return db.run_query(conn, sql)
+        return db.run_query(conn, sql, params)
 
 # objeto para usar en snapshot.py y poder ejecutar las consultas
 db_client = DBAuditInterface()

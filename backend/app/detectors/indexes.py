@@ -1,5 +1,6 @@
-from app.detectors.base import Detector
+from venv import logger
 
+from detectors.base import Detector
 
 class ForeignKeyIndexDetector(Detector):
     
@@ -56,47 +57,27 @@ class ForeignKeyIndexDetector(Detector):
 
 
 class UnusedIndexesDetector(Detector):
-    
-    #Detecta índices que nunca se usan.
-    
     category = "indexes"
 
     def run(self, snap):
-
         issues = []
-
+        
         for idx in snap.indexes:
+            name = idx.get("index_name")
+            scans = idx.get("idx_scan", 0)
+            activity = idx.get("table_activity", 0)
 
-            index_name = idx["index_name"]
-            table_name = idx["table_name"]
-            scans = idx["idx_scan"]
 
-            # Ignorar primary keys automáticas
-            if "_pkey" in index_name:
-                continue
-
-            # Índice nunca usado
-            if scans == 0:
-
-                issues.append(
-                    self._add_issue(
-                        code="IDX002",
-                        level="medium",
-                        title="Índice nunca usado",
-                        desc=f"El índice '{index_name}' de la tabla "
-                             f"'{table_name}' no ha sido utilizado.",
-                        table=table_name,
-                        sql_check=f"""
-                            SELECT *
-                            FROM pg_stat_user_indexes
-                            WHERE indexrelname = '{index_name}';
-                        """,
-                        sql_fix=f"""
-                            DROP INDEX {index_name};
-                        """
-                    )
-                )
-
+            if scans == 0 and activity > 100:
+            
+                issues.append(self._add_issue(
+                    code="IDX002",
+                    level="medium",
+                    title="Índice nunca usado",
+                    desc=f"El índice '{name}' no registra uso mientras la tabla tiene actividad de más de 100 consultas y cero escaneos.",
+                    table=idx.get("table_name")
+                ))
+        
         return issues
 
 
@@ -153,4 +134,31 @@ class DuplicateIndexesDetector(Detector):
             else:
                 seen_indexes[key] = index_name
 
+        return issues
+    
+class PartialIndexDetector(Detector):
+    category = "indexes"
+
+    def run(self, snap):
+        issues = []
+        tipos_ok = ['bool', 'varchar', 'text', 'int2', 'int4']
+
+        for st in snap.column_stats:
+            # Si tiene sesgo, es el tipo de dato correcto y NO es PK/FK
+            if (st.get("max_freq", 0) > 90 and 
+                st.get("d_type") in tipos_ok and 
+                not st.get("is_key")):
+                
+                tab, col = st["tablename"], st["column_name"]
+                val = st["vals"].replace("{", "").replace("}", "").split(",")[0]
+
+                issues.append(self._add_issue(
+                    code="IDX004",
+                    level="medium",
+                    title=f"Índice parcial en {tab}.{col}",
+                    desc=f"Valor '{val}' domina el {st['max_freq']:.1f}% de la tabla.",
+                    table=tab,
+                    sql_check=f"SELECT {col}, count(*) FROM {tab} GROUP BY 1 ORDER BY 2 DESC;",
+                    sql_fix=f"CREATE INDEX idx_{tab}_{col}_part ON {tab}({col}) WHERE {col} != '{val}';"
+                ))
         return issues

@@ -39,8 +39,10 @@ services:
       pgguardian-db:
         condition: service_healthy
     environment:
+      PYTHONPATH: /app
       TARGET_DB_URI: postgresql://tienda_user:tienda_pass@db:5432/tiendadb
       OWN_DB_URI: postgresql://guardian_admin:pg_pass@pgguardian-db:5432/pgguardian
+      
 
 volumes:
   pgguardian_data:

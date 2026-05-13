@@ -1,4 +1,9 @@
-from app.detectors.base import Detector
+import time
+
+from detectors.base import Detector
+from connector.pg_client import db_client
+# En h2.py o snapshot.py
+
 
 
 class IdleInTransactionDetector(Detector):
@@ -17,21 +22,31 @@ class IdleInTransactionDetector(Detector):
         for conn in snap.connections:
             state = conn.get("state")
             seconds_idle = conn.get("seconds_idle") or 0
+            seconds_running = conn.get("seconds_running") or 0
             pid = conn.get("pid")
             user = conn.get("usename")
             query = conn.get("query") or ""
 
-            # Umbral sugerido: más de 5 minutos inactivo dentro de una transacción
-            if state == "idle in transaction" and seconds_idle > 300:
+            tiempo_formateado = f"{int(seconds_idle // 60)} minutos" if seconds_idle >= 60 else f"{int(seconds_idle)} segundos"
+          
+            if state == "idle in transaction":
+                if seconds_idle > 1800:
+                    severity = "high"
+                    title = "Transacción inactiva crítica — más de 30 minutos"
+                elif seconds_idle > 300:
+                    severity = "medium"
+                    title = "Transacción inactiva — más de 5 minutos"
+                else:
+                    continue         
                 issues.append(
                     self._add_issue(
                         code="HLT001",
-                        level="high",
-                        title="Transacción inactiva abierta por demasiado tiempo",
+                        level= severity,
+                        title=title,
                         desc=(
-                            f"La sesión PID {pid}, del usuario '{user}', lleva "
-                            f"{int(seconds_idle)} segundos en estado idle in transaction. "
-                            "Esto puede retener locks, bloquear mantenimiento y afectar el rendimiento."
+                            f"El PID {pid} (usuario '{user}') lleva {tiempo_formateado} "
+                            "inactivo dentro de una transacción abierta. Esto es peligroso "
+                            "porque puede retener locks y bloquear el mantenimiento (VACUUM)."
                         ),
                         table="",
                         sql_check=(
@@ -41,13 +56,37 @@ class IdleInTransactionDetector(Detector):
                             "WHERE state = 'idle in transaction';"
                         ),
                         sql_fix=(
-                            f"-- Revisar la sesión antes de terminarla\n"
                             f"SELECT pg_terminate_backend({pid});"
                         )
                     )
-                )
 
+                )
+            elif state == "active" and "pg_sleep" in query.lower():
+                # Aplicamos niveles según la duración de la query
+                if seconds_running > 1800: # 30 min
+                    severity = "high"
+                    title = "Sesión crítica bloqueada por pg_sleep"
+                elif seconds_running > 300: # 5 min
+                    severity = "medium"
+                    title = "Sesión prolongada detectada po pg_sleep"
+                else:
+                    continue # Menos de 5 min no se reporta
+
+                issues.append(
+                    self._add_issue(
+                        code="HLT001",
+                        level=severity,
+                        title=title,
+                        desc=(
+                            f"El PID {pid} está ejecutando un bloqueo vía pg_sleep por {int(seconds_running // 60)} min. "
+                        ),
+                        table="",
+                        sql_check=f"SELECT pid, query, now() - query_start FROM pg_stat_activity WHERE pid = {pid};",
+                        sql_fix=f"SELECT pg_terminate_backend({pid});"
+                    )
+                )
         return issues
+
 
 
 class ActiveLocksDetector(Detector):
@@ -157,11 +196,81 @@ class ConnectionSpikeDetector(Detector):
                     "SHOW max_connections;"
                 ),
                 sql_fix=(
-                    "-- Recomendación: revisar si la app usa connection pooling.\n"
-                    "-- Opciones: PgBouncer, ajustar pool del backend o revisar max_connections."
+                    "Recomendación: revisar si la app usa connection pooling.\n"
+                    "Opciones: PgBouncer, ajustar pool del backend o revisar max_connections."
                 )
             )
         )
 
         return issues
+    
+class TableGrowDetector(Detector):
+    #Detecta tablas que crecen sin control y no manejan particonamiento
 
+    category = "health"
+
+    def run(self, snap):
+        issues = []
+        one_year = 31536000
+        
+        for table in snap.tables:
+            table_name = table.get("table_name")
+            is_partitioned = table.get("is_partitioned") or False
+            
+            # Si ya está particionada no es problema
+            if is_partitioned:
+                continue
+            
+            
+            # Solo datos muy antiguos
+            oldest_age = self._get_oldest_age(table_name)
+            if oldest_age is None or oldest_age < one_year:
+                continue
+            
+            years_old = round(oldest_age / one_year, 1)
+            issues.append(
+                self._add_issue(
+                code="HLT004",
+                level="medium",
+                title=f"Crecimiento descontrolado: {table_name}",
+                desc=(
+                    f"La tabla '{table_name}' no usa particionamiento y tiene "
+                    f"registros de hace {years_old} años."
+                ),
+                table=table_name,
+                sql_check=f"SELECT MIN(created_at), COUNT(*) FROM {table_name};",
+                sql_fix=(
+                    f"DELETE FROM {table_name} "
+                    f"WHERE created_at < NOW() - INTERVAL '1 year';"
+                )
+            )
+        )
+            return issues
+    
+    
+    def _get_oldest_age(self, table_name):
+        try:
+            # Buscamos columnas candidatas de fecha
+            # Usamos alias para db_client si está importado globalmente
+            col_query = db_client.execute_query("""
+                SELECT column_name 
+                FROM information_schema.columns
+                WHERE table_name = %s
+                  AND column_name IN ('created_at', 'created', 'fecha', 'timestamp', 'fecha_registro')
+                  AND table_schema NOT IN ('pg_catalog', 'information_schema')
+                LIMIT 1
+            """, (table_name,))
+            
+            if not col_query:
+                return None
+                
+            date_col = col_query[0]["column_name"]
+            
+            # Obtenemos la edad del registro más antiguo
+            result = db_client.execute_query(f"SELECT EXTRACT(EPOCH FROM (NOW() - MIN({date_col}))) AS age FROM {table_name}")
+            
+            return float(result[0]["age"]) if result and result[0]["age"] is not None else None
+            
+        except Exception as e:
+            print(f"Error analizando antigüedad de {table_name}: {e}")
+            return None

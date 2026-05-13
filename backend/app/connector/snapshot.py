@@ -4,7 +4,7 @@ from .pg_client import db_client
 # clase para guardar toda la información del snapshot en un solo objeto
 class Snapshot:
     def __init__(self, table_stats, index_usage, index_defs, fks_health, config, 
-                 live_activity, query_stats, lock_status):
+                 live_activity, query_stats, lock_status, autovacuum_disabled):
         self.tables = table_stats
         self.indexes = index_usage
         self.index_definitions = index_defs
@@ -13,6 +13,7 @@ class Snapshot:
         self.connections = live_activity
         self.slow_queries = query_stats
         self.locks = lock_status
+        self.autovacuum_disabled = autovacuum_disabled
 
 def take_snapshot():
     print("Capturando tablas")
@@ -39,8 +40,12 @@ def take_snapshot():
     print("Capturando bloqueos")
     lock_status = _get_blocking_locks()
 
+    print("Capturando autovacuum")                  
+    autovacuum_disabled = _get_autovacuum_disabled() 
+  
+
     return Snapshot(table_stats, index_usage, index_defs, fks_health, config, live_activity, 
-                    query_stats, lock_status)
+                    query_stats, lock_status, autovacuum_disabled)
 
 
 def _get_table_health():
@@ -51,7 +56,15 @@ def _get_table_health():
              (SELECT relkind = 'p' FROM pg_class 
              WHERE relname = t.relname LIMIT 1) AS is_partitioned
         FROM pg_stat_user_tables t
-    """)          
+    """)  
+
+def _get_autovacuum_disabled():
+    return db_client.execute_query("""
+        SELECT relname AS table_name
+        FROM pg_class
+        WHERE relkind = 'r'
+          AND COALESCE(reloptions::text, '') LIKE '%%autovacuum_enabled=false%%'
+    """)     
 
 def _get_index_usage():
 #Monitorear cual es la frecuencia de uso de los índices

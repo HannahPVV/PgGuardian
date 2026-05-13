@@ -1,4 +1,4 @@
-from app.storage.models import SnapshotRecord, Finding
+from storage.models import SnapshotRecord, Finding
 
 class SnapshotComparator:
     def __init__(self, session):

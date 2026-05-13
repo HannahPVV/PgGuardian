@@ -117,3 +117,29 @@ class IndexBloatDetector(Detector):
                 )
 
         return issues
+
+class AutovacuumDisabledDetector(Detector):
+    #Detecta tablas con autovacuum desactivado explícitamente, lo cual puede causar bloat severo.
+        
+    category = "bloat"
+    def run(self, snap):
+        issues = []
+        for table in snap.autovacuum_disabled:
+            table_name = table.get("table_name")
+            issues.append(
+                self._add_issue(
+                    code="BLT003",
+                    level="high",
+                    title=f"Autovacuum desactivado en '{table_name}'",
+                    desc=(f"La tabla '{table_name}' tiene autovacuum desactivado "
+                    "explícitamente. Esto impide la limpieza automática de "
+                    "dead tuples y puede causar bloat severo con el tiempo."
+                    ),table=table_name,
+                    sql_check=(
+                        "SELECT reloptions FROM pg_class "
+                        f"WHERE relname = '{table_name}';"),
+                    sql_fix=(
+                     f"ALTER TABLE {table_name} RESET (autovacuum_enabled);")
+                )
+            )
+            return issues

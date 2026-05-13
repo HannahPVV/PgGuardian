@@ -198,4 +198,52 @@ class ConnectionSpikeDetector(Detector):
         )
 
         return issues
+    
+class TableGrowDetector(Detector):
+    #Detecta tablas que crecen sin control y no manejan particonamiento
+
+    category = "health"
+
+    def run(self, snap):
+        issues = []
+        
+        # tiempo - 1 año en segundos (aprox 31,536,000 segundos)
+        time = 31536000 
+
+        for table in snap.tables:
+            table_name = table.get("table_name")
+            is_partitioned = table.get("is_partitioned") or False
+            oldest_age = table.get("oldest_record_age_seconds") or 0
+            
+            # Solo se anlizan tablas que NO están particionadas
+            if not is_partitioned:
+                # Si tiene registros que superan el año de antigüedad
+                if oldest_age > time:
+                    
+                    years_old = round(oldest_age / (365 * 24 * 3600), 1)
+                    
+                    issues.append(
+                        self._add_issue(
+                            code="HLT004",
+                            level="medium", # Severidad MEDIA 
+                            title=f"Crecimiento de tabla descontrolado: {table_name}",
+                            desc=(
+                                f"La tabla '{table_name}' no utiliza particionamiento y contiene "
+                                f"registros de hace {years_old} años. Esto indica una acumulación "
+                                "excesiva de datos históricos que puede degradar el rendimiento."
+                            ),
+                            table=table_name,
+                            sql_check=(
+                                f"SELECT MIN(created_at) AS oldest_record, count(*) AS total_rows "
+                                f"FROM {table_name};"
+                            ),
+                            sql_fix=(
+                                f"Implementar partcionamiento o filtrar datos antiguos:"
+                                f"DELETE FROM {table_name} WHERE created_at < NOW() - INTERVAL '1 year';"
+            
+                            )
+                        )
+                    )
+
+        return issues
 

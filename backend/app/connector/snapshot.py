@@ -47,9 +47,15 @@ def _get_table_health():
 #Captura estadísticas de bloat y vacuum 
     return db_client.execute_query("""
         SELECT schemaname, relname AS table_name, n_live_tup, n_dead_tup, 
-            seq_scan, n_mod_since_analyze, last_autovacuum
-        FROM pg_stat_user_tables
-    """)
+            seq_scan, n_mod_since_analyze, last_autovacuum,
+            (SELECT relkind = 'p' FROM pg_class WHERE relname = t.relname LIMIT 1) AS is_partitioned,
+            COALESCE(
+                EXTRACT(EPOCH FROM (now() - (
+                    SELECT MIN(created_at) FROM event_log WHERE t.relname = 'event_log'
+                ))), 0
+            ) AS oldest_record_age_seconds                   
+        FROM pg_stat_user_tables t
+    """)           
 
 def _get_index_usage():
 #Monitorear cual es la frecuencia de uso de los índices

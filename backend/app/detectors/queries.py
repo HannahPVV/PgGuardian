@@ -22,7 +22,7 @@ class TopQueriesDetector(Detector):
             db_name = query_data.get("datname", "N/A")
 
             # Solo reportamos si el tiempo total es significativo 
-            if total_time > 100:
+            if total_time > 500:
                 issues.append(
                     self._add_issue(
                         code="PRF001",

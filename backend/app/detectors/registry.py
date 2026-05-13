@@ -1,7 +1,7 @@
 import logging
 
 from .indexes import ForeignKeyIndexDetector, UnusedIndexesDetector, DuplicateIndexesDetector
-from .health import IdleInTransactionDetector, ActiveLocksDetector, ConnectionSpikeDetector
+from .health import IdleInTransactionDetector, ActiveLocksDetector, ConnectionSpikeDetector, TableGrowDetector
 from .queries import TopQueriesDetector
 
 # Configuración básica para ver qué está pasando en la terminal
@@ -20,6 +20,7 @@ class DetectorRegistry:
             ActiveLocksDetector(),
             ConnectionSpikeDetector(),
             TopQueriesDetector(),
+            TableGrowDetector()
         ]
 
     def run_all(self, snap_object):

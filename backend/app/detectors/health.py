@@ -1,4 +1,9 @@
+import time
+
 from detectors.base import Detector
+from connector.pg_client import db_client
+# En h2.py o snapshot.py
+
 
 
 class IdleInTransactionDetector(Detector):
@@ -191,8 +196,8 @@ class ConnectionSpikeDetector(Detector):
                     "SHOW max_connections;"
                 ),
                 sql_fix=(
-                    "-- Recomendación: revisar si la app usa connection pooling.\n"
-                    "-- Opciones: PgBouncer, ajustar pool del backend o revisar max_connections."
+                    "Recomendación: revisar si la app usa connection pooling.\n"
+                    "Opciones: PgBouncer, ajustar pool del backend o revisar max_connections."
                 )
             )
         )
@@ -206,44 +211,66 @@ class TableGrowDetector(Detector):
 
     def run(self, snap):
         issues = []
+        one_year = 31536000
         
-        # tiempo - 1 año en segundos (aprox 31,536,000 segundos)
-        time = 31536000 
-
         for table in snap.tables:
             table_name = table.get("table_name")
             is_partitioned = table.get("is_partitioned") or False
-            oldest_age = table.get("oldest_record_age_seconds") or 0
             
-            # Solo se anlizan tablas que NO están particionadas
-            if not is_partitioned:
-                # Si tiene registros que superan el año de antigüedad
-                if oldest_age > time:
-                    
-                    years_old = round(oldest_age / (365 * 24 * 3600), 1)
-                    
-                    issues.append(
-                        self._add_issue(
-                            code="HLT004",
-                            level="medium", # Severidad MEDIA 
-                            title=f"Crecimiento de tabla descontrolado: {table_name}",
-                            desc=(
-                                f"La tabla '{table_name}' no utiliza particionamiento y contiene "
-                                f"registros de hace {years_old} años. Esto indica una acumulación "
-                                "excesiva de datos históricos que puede degradar el rendimiento."
-                            ),
-                            table=table_name,
-                            sql_check=(
-                                f"SELECT MIN(created_at) AS oldest_record, count(*) AS total_rows "
-                                f"FROM {table_name};"
-                            ),
-                            sql_fix=(
-                                f"Implementar partcionamiento o filtrar datos antiguos:"
-                                f"DELETE FROM {table_name} WHERE created_at < NOW() - INTERVAL '1 year';"
+            # Si ya está particionada no es problema
+            if is_partitioned:
+                continue
             
-                            )
-                        )
-                    )
-
-        return issues
-
+            
+            # Solo datos muy antiguos
+            oldest_age = self._get_oldest_age(table_name)
+            if oldest_age is None or oldest_age < one_year:
+                continue
+            
+            years_old = round(oldest_age / one_year, 1)
+            issues.append(
+                self._add_issue(
+                code="HLT004",
+                level="medium",
+                title=f"Crecimiento descontrolado: {table_name}",
+                desc=(
+                    f"La tabla '{table_name}' no usa particionamiento y tiene "
+                    f"registros de hace {years_old} años."
+                ),
+                table=table_name,
+                sql_check=f"SELECT MIN(created_at), COUNT(*) FROM {table_name};",
+                sql_fix=(
+                    f"DELETE FROM {table_name} "
+                    f"WHERE created_at < NOW() - INTERVAL '1 year';"
+                )
+            )
+        )
+            return issues
+    
+    
+    def _get_oldest_age(self, table_name):
+        try:
+            # Buscamos columnas candidatas de fecha
+            # Usamos alias para db_client si está importado globalmente
+            col_query = db_client.execute_query("""
+                SELECT column_name 
+                FROM information_schema.columns
+                WHERE table_name = %s
+                  AND column_name IN ('created_at', 'created', 'fecha', 'timestamp', 'fecha_registro')
+                  AND table_schema NOT IN ('pg_catalog', 'information_schema')
+                LIMIT 1
+            """, (table_name,))
+            
+            if not col_query:
+                return None
+                
+            date_col = col_query[0]["column_name"]
+            
+            # Obtenemos la edad del registro más antiguo
+            result = db_client.execute_query(f"SELECT EXTRACT(EPOCH FROM (NOW() - MIN({date_col}))) AS age FROM {table_name}")
+            
+            return float(result[0]["age"]) if result and result[0]["age"] is not None else None
+            
+        except Exception as e:
+            print(f"Error analizando antigüedad de {table_name}: {e}")
+            return None

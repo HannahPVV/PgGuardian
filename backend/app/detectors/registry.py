@@ -4,6 +4,7 @@ from .indexes import ForeignKeyIndexDetector, UnusedIndexesDetector, DuplicateIn
 from .health import IdleInTransactionDetector, ActiveLocksDetector, ConnectionSpikeDetector, TableGrowDetector
 from .queries import TopQueriesDetector
 from .bloat import TableBloatDetector, IndexBloatDetector, AutovacuumDisabledDetector
+from .config import ConfigurationDetector
 
 
 # Configuración básica para ver qué está pasando en la terminal
@@ -25,7 +26,8 @@ class DetectorRegistry:
             TableGrowDetector(),
             TableBloatDetector(),
             IndexBloatDetector(),
-            AutovacuumDisabledDetector()
+            AutovacuumDisabledDetector(),
+            ConfigurationDetector()
         ]
 
     def run_all(self, snap_object):

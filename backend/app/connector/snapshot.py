@@ -114,7 +114,8 @@ def _get_runtime_settings():
         SELECT name, setting, unit, context, short_desc
         FROM pg_settings 
         WHERE name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 
-                       'maintenance_work_mem', 'max_connections', 'autovacuum')
+                       'maintenance_work_mem', 'max_connections', 'autovacuum',
+                        'pg_stat_statements.max', 'log_min_duration_statement')
     """)
 
 def _get_active_sessions():

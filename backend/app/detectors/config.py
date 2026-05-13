@@ -1,4 +1,4 @@
-from app.detectors.base import Detector
+from detectors.base import Detector
 
 
 class ConfigurationDetector(Detector):
@@ -107,7 +107,7 @@ class ConfigurationDetector(Detector):
 
         work_mem_mb = self._setting_to_mb(settings, "work_mem")
 
-        if work_mem_mb is not None and work_mem_mb < 4:
+        if work_mem_mb is not None and work_mem_mb < 16:
             issues.append(
                 self._add_issue(
                     code="CFG002",

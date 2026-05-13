@@ -4,7 +4,7 @@ from .pg_client import db_client
 # clase para guardar toda la información del snapshot en un solo objeto
 class Snapshot:
     def __init__(self, table_stats, index_usage, index_defs, fks_health, config, 
-                 live_activity, query_stats, lock_status, autovacuum_disabled):
+                 live_activity, query_stats, lock_status, autovacuum_disabled, constraint_indexes):
         self.tables = table_stats
         self.indexes = index_usage
         self.index_definitions = index_defs
@@ -14,7 +14,7 @@ class Snapshot:
         self.slow_queries = query_stats
         self.locks = lock_status
         self.autovacuum_disabled = autovacuum_disabled
-
+        self.constraint_indexes = constraint_indexes
 def take_snapshot():
     print("Capturando tablas")
     table_stats = _get_table_health()
@@ -42,10 +42,13 @@ def take_snapshot():
 
     print("Capturando autovacuum")                  
     autovacuum_disabled = _get_autovacuum_disabled() 
+
+    print("Capturando constraints")
+    constraint_indexes = _get_constraint_indexes()
   
 
     return Snapshot(table_stats, index_usage, index_defs, fks_health, config, live_activity, 
-                    query_stats, lock_status, autovacuum_disabled)
+                    query_stats, lock_status, autovacuum_disabled, constraint_indexes)
 
 
 def _get_table_health():
@@ -95,6 +98,14 @@ def _get_unindexed_fks():
          AND kcu.table_schema = tc.table_schema
         WHERE tc.constraint_type = 'FOREIGN KEY' 
           AND kcu.table_schema NOT IN ('pg_catalog', 'information_schema')
+    """)
+
+def _get_constraint_indexes():
+    # Postgres sabe qué índices son constraints 
+    return db_client.execute_query("""
+        SELECT conname AS index_name
+        FROM pg_constraint
+        WHERE contype IN ('p', 'u')
     """)
 
 def _get_runtime_settings():

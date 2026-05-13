@@ -64,14 +64,15 @@ class UnusedIndexesDetector(Detector):
 
         issues = []
 
+        constraint_names = {r["index_name"] for r in snap.constraint_indexes}
+
         for idx in snap.indexes:
 
             index_name = idx["index_name"]
             table_name = idx["table_name"]
             scans = idx["idx_scan"]
 
-            # Ignorar primary keys automáticas
-            if "_pkey" in index_name:
+            if index_name in constraint_names:
                 continue
 
             # Índice nunca usado

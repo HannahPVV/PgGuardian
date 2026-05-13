@@ -21,7 +21,7 @@ class DetectorRegistry:
             ActiveLocksDetector(),
             ConnectionSpikeDetector(),
             TopQueriesDetector(),
-            TableGrowDetector()
+            TableGrowDetector(),
             TableBloatDetector(),
             IndexBloatDetector(),
         ]

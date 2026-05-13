@@ -4,7 +4,7 @@ from .pg_client import db_client
 # clase para guardar toda la información del snapshot en un solo objeto
 class Snapshot:
     def __init__(self, table_stats, index_usage, index_defs, fks_health, config, 
-                 live_activity, query_stats, lock_status, autovacuum_disabled, constraint_indexes):
+                 live_activity, query_stats, lock_status, autovacuum_disabled, constraint_indexes, column_stats, refresh_statistics):
         self.tables = table_stats
         self.indexes = index_usage
         self.index_definitions = index_defs
@@ -15,6 +15,11 @@ class Snapshot:
         self.locks = lock_status
         self.autovacuum_disabled = autovacuum_disabled
         self.constraint_indexes = constraint_indexes
+        self.column_stats = column_stats
+        self.refresh_statistics = refresh_statistics
+        
+
+
 def take_snapshot():
     print("Capturando tablas")
     table_stats = _get_table_health()
@@ -45,10 +50,22 @@ def take_snapshot():
 
     print("Capturando constraints")
     constraint_indexes = _get_constraint_indexes()
-  
+
+    print("Capturando estadísticas de columnas")
+    column_stats = _get_column_stats()
+
+    print("Capturando llaves del sistema (PK/FK)")
+    db_keys = _get_database_keys()
+
+    print("Refrescando estadísticas para análisis dinámicos")
+    refresh_statistics= _refresh_statistics()
+
+    for stat in column_stats:
+        # Si tabla, columna existe en nuestras llaves, marcamos True
+        stat['is_key'] = (stat['tablename'], stat['column_name']) in db_keys
 
     return Snapshot(table_stats, index_usage, index_defs, fks_health, config, live_activity, 
-                    query_stats, lock_status, autovacuum_disabled, constraint_indexes)
+                    query_stats, lock_status, autovacuum_disabled, constraint_indexes, column_stats,refresh_statistics)
 
 
 def _get_table_health():
@@ -152,3 +169,42 @@ def _get_blocking_locks():
         WHERE l.relation IS NOT NULL 
           AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())
     """)
+
+def _refresh_statistics():
+    #Analiza las tablas
+    try:
+        # LISTA DE TABLAS
+        tables = db_client.execute_query("SELECT tablename FROM pg_tables WHERE schemaname = 'public';")
+        for t in tables:
+            # Ejecutamos ANALYZE sobre cada tabla encontrada
+            db_client.execute_query(f"ANALYZE {t['tablename']};")
+    except Exception as e:
+        print(f"Error: {e}")
+
+def _get_database_keys():
+    # Trae las PK y FK para marcar en nuestras estadísticas de columnas
+    query = """
+        SELECT relname as tabla, attname as columna
+        FROM pg_constraint con
+        JOIN pg_class rel ON rel.oid = con.conrelid
+        JOIN pg_attribute att ON att.attrelid = rel.oid AND att.attnum = ANY(con.conkey)
+        WHERE con.contype IN ('p', 'f');
+    """
+    res = db_client.execute_query(query)
+    # tuplas para comparar fácil
+    return {(r['tabla'], r['columna']) for r in res}
+
+def _get_column_stats():
+    #Trae las estadísticas básicas para detectar col que tienen un valor muy dominante
+    return db_client.execute_query("""
+        SELECT s.tablename, s.attname as column_name, 
+               (s.most_common_freqs[1] * 100) as max_freq,
+               s.most_common_vals::text as vals, t.typname as d_type
+        FROM pg_stats s
+        JOIN pg_type t ON t.oid = (
+            SELECT atttypid FROM pg_attribute 
+            WHERE attrelid = s.tablename::regclass AND attname = s.attname
+        )
+        WHERE s.schemaname = 'public' AND s.most_common_freqs IS NOT NULL;
+    """)
+

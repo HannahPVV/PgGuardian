@@ -1,6 +1,6 @@
 import logging
 
-from .indexes import ForeignKeyIndexDetector, UnusedIndexesDetector, DuplicateIndexesDetector
+from .indexes import ForeignKeyIndexDetector, UnusedIndexesDetector, DuplicateIndexesDetector, PartialIndexDetector
 from .health import IdleInTransactionDetector, ActiveLocksDetector, ConnectionSpikeDetector, TableGrowDetector
 from .queries import TopQueriesDetector
 from .bloat import TableBloatDetector, IndexBloatDetector, AutovacuumDisabledDetector
@@ -19,6 +19,7 @@ class DetectorRegistry:
             ForeignKeyIndexDetector(),
             UnusedIndexesDetector(),
             DuplicateIndexesDetector(),
+            PartialIndexDetector(),
             IdleInTransactionDetector(),
             ActiveLocksDetector(),
             ConnectionSpikeDetector(),
@@ -27,7 +28,7 @@ class DetectorRegistry:
             TableBloatDetector(),
             IndexBloatDetector(),
             AutovacuumDisabledDetector(),
-            ConfigurationDetector()
+            ConfigurationDetector(),
         ]
 
     def run_all(self, snap_object):

@@ -154,3 +154,30 @@ class DuplicateIndexesDetector(Detector):
                 seen_indexes[key] = index_name
 
         return issues
+    
+class PartialIndexDetector(Detector):
+    category = "indexes"
+
+    def run(self, snap):
+        issues = []
+        tipos_ok = ['bool', 'varchar', 'text', 'int2', 'int4']
+
+        for st in snap.column_stats:
+            # Si tiene sesgo, es el tipo de dato correcto y NO es PK/FK
+            if (st.get("max_freq", 0) > 90 and 
+                st.get("d_type") in tipos_ok and 
+                not st.get("is_key")):
+                
+                tab, col = st["tablename"], st["column_name"]
+                val = st["vals"].replace("{", "").replace("}", "").split(",")[0]
+
+                issues.append(self._add_issue(
+                    code="IDX004",
+                    level="medium",
+                    title=f"Índice parcial en {tab}.{col}",
+                    desc=f"Valor '{val}' domina el {st['max_freq']:.1f}% de la tabla.",
+                    table=tab,
+                    sql_check=f"SELECT {col}, count(*) FROM {tab} GROUP BY 1 ORDER BY 2 DESC;",
+                    sql_fix=f"CREATE INDEX idx_{tab}_{col}_part ON {tab}({col}) WHERE {col} != '{val}';"
+                ))
+        return issues

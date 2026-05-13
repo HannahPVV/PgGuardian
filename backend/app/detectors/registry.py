@@ -2,6 +2,7 @@ import logging
 
 from .indexes import ForeignKeyIndexDetector, UnusedIndexesDetector, DuplicateIndexesDetector
 from .health import IdleInTransactionDetector, ActiveLocksDetector, ConnectionSpikeDetector
+from .queries import TopQueriesDetector
 
 # Configuración básica para ver qué está pasando en la terminal
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +19,7 @@ class DetectorRegistry:
             IdleInTransactionDetector(),
             ActiveLocksDetector(),
             ConnectionSpikeDetector(),
+            TopQueriesDetector(),
         ]
 
     def run_all(self, snap_object):

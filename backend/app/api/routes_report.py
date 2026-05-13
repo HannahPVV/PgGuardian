@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from storage.models import SnapshotRecord, Finding, Report, get_session
+from analysis.comparator import SnapshotComparator
 
 router = APIRouter()
 
@@ -72,5 +73,23 @@ def get_summary(snapshot_id: int):
             "total_low": report.total_low,
             "created_at": report.created_at
         }
+    finally:
+        session.close()
+
+@router.get("/compare/{snapshot_id}")
+def get_comparison(snapshot_id: int):
+    """
+    Endpoint para la Persona 4: Compara el snapshot actual con el anterior
+    para ver la evolución de la salud de la base de datos.
+    """
+    session = get_session()
+    try:
+        comparator = SnapshotComparator(session)
+        result = comparator.compare(snapshot_id)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="No se pudo realizar la comparación")
+            
+        return result
     finally:
         session.close()

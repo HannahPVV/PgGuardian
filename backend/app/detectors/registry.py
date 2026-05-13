@@ -3,6 +3,7 @@ import logging
 from .indexes import ForeignKeyIndexDetector, UnusedIndexesDetector, DuplicateIndexesDetector
 from .health import IdleInTransactionDetector, ActiveLocksDetector, ConnectionSpikeDetector, TableGrowDetector
 from .queries import TopQueriesDetector
+from .bloat import TableBloatDetector, IndexBloatDetector
 
 # Configuración básica para ver qué está pasando en la terminal
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +22,8 @@ class DetectorRegistry:
             ConnectionSpikeDetector(),
             TopQueriesDetector(),
             TableGrowDetector()
+            TableBloatDetector(),
+            IndexBloatDetector(),
         ]
 
     def run_all(self, snap_object):

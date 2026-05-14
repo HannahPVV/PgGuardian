@@ -74,7 +74,41 @@
         </div>
     </div>
 </div>
+{% if id_base and id_actual %}
+<div class="glass-card p-8 mb-12 border-green-500/10 bg-green-500/[0.01]">
+    <div class="flex items-center gap-3 mb-6">
+        <svg class="text-green-400 w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h3 class="tech-font text-lg uppercase tracking-wider text-green-400">Problemas Corregidos Exitosamente</h3>
+    </div>
 
+    {% if hallazgos_solucionados %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for issue in hallazgos_solucionados %}
+                <div class="p-4 bg-black/30 rounded-xl border border-green-500/20 hover:border-green-500/40 transition-all duration-300">
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <span class="text-[9px] font-mono bg-green-500/10 text-green-400 px-2 py-0.5 rounded border border-green-500/20">
+                            {{ issue.problem_code or "FIX" }}
+                        </span>
+                        <span class="text-[9px] text-slate-500 font-mono">
+                            {{ issue.table_name or "Global" }}
+                        </span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-1">{{ issue.title }}</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">{{ issue.description }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-6 bg-black/10 rounded-xl border border-white/5">
+            <p class="text-xs text-slate-500 uppercase tracking-widest">
+                No se detectaron cambios remediados entre ambos snapshots.
+            </p>
+        </div>
+    {% endif %}
+</div>
+{% endif %}
 <div class="text-center">
     {% if id_actual %}
         <a href="/download-report/{{ id_actual }}" 

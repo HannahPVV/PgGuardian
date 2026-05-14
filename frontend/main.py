@@ -2,9 +2,10 @@ import os
 import requests
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from typing import Optional 
 
 app = FastAPI(title="PgGuardian Frontend")
 base_path = os.path.dirname(os.path.abspath(__file__))
@@ -91,39 +92,57 @@ async def report(request: Request):
 
 
 @app.get("/compare", response_class=HTMLResponse)
-async def compare(request: Request, base_id: int = None, actual_id: int = None):
-    # Forzamos a que la lista empiece vacía
+async def compare(request: Request, base_id: Optional[str] = None, actual_id: Optional[str] = None):
     lista_final = []
     mejora, resueltos, ahorro = 0, 0, 0
     
+    # 1. Convertimos a entero de forma segura
+    b_id = int(base_id) if base_id and base_id.isdigit() else None
+    a_id = int(actual_id) if actual_id and actual_id.isdigit() else None
+    
     try:
-        
-        print("Intentando conectar al API...")
+        # 2. Siempre cargamos la lista para los selectores del HTML
         response = requests.get(f"{API_BASE_URL}/snapshots")
-        
         if response.status_code == 200:
             lista_final = response.json()
-            # ESTO DEBE SALIR EN LA TERMINAL:
-            print(f"ÉXITO: Se cargaron {len(lista_final)} snapshots")
-        else:
-            print(f"ERROR: El API respondió con código {response.status_code}")
-
-     
-        if base_id and actual_id:
-            data_1 = requests.get(f"{API_BASE_URL}/summary/{base_id}").json()
-            data_2 = requests.get(f"{API_BASE_URL}/summary/{actual_id}").json()
+        
+        # 3. Solo si tenemos ambos IDs calculamos la comparación
+        if b_id and a_id:
+            # Pedimos los resúmenes al backend usando los IDs numéricos
+            res_1 = requests.get(f"{API_BASE_URL}/summary/{b_id}")
+            res_2 = requests.get(f"{API_BASE_URL}/summary/{a_id}")
             
-            # Sumamos hallazgos para comparar
-            total_1 = data_1.get('total_high', 0) + data_1.get('total_medium', 0)
-            total_2 = data_2.get('total_high', 0) + data_2.get('total_medium', 0)
-            
-            resueltos = max(0, total_1 - total_2)
-            mejora = 100 if total_2 == 0 else min(100, int((resueltos / total_1) * 100)) if total_1 > 0 else 0
-            ahorro = resueltos * 150
+            if res_1.status_code == 200 and res_2.status_code == 200:
+                data_1 = res_1.json()
+                data_2 = res_2.json()
+                
+                # Sumamos hallazgos (Críticos + Medios)
+                total_1 = data_1.get('total_high', 0) + data_1.get('total_medium', 0)
+                total_2 = data_2.get('total_high', 0) + data_2.get('total_medium', 0)
+                
+                # Lógica de mejora
+                resueltos = max(0, total_1 - total_2)
+                if total_1 > 0:
+                    mejora = min(100, int((resueltos / total_1) * 100))
+                elif total_1 == 0 and total_2 == 0:
+                    mejora = 0 # No hay problemas, no hay mejora que medir
+                
+                ahorro = resueltos * 150 # Dato ficticio para el KPI
+                print(f"Comparación exitosa: {b_id} vs {a_id}")
 
     except Exception as e:
-        print(f"HUBO UN PROBLEMA: {e}")
+        print(f"HUBO UN PROBLEMA EN COMPARE: {e}")
 
+    # 4. Retornamos al template (pasamos los IDs originales para que el HTML sepa cuál seleccionar)
+    return templates.TemplateResponse("compare.html", {
+        "request": request,
+        "snapshots": lista_final, 
+        "id_base": b_id,
+        "id_actual": a_id,
+        "puntos_mejorados": mejora,
+        "resueltos": resueltos,
+        "ahorro": ahorro
+    })
     
     return templates.TemplateResponse("compare.html", {
         "request": request,
@@ -146,7 +165,35 @@ async def run_audit():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.get("/download-report/{snapshot_id}")
+async def download_report(snapshot_id: str):
+    # 1. Validación de seguridad para evitar el error "None"
+    if snapshot_id == "None" or not snapshot_id:
+        return {"status": "error", "message": "Por favor, selecciona un snapshot primero."}
 
+    try:
+        # 2. Llamamos al backend pasando el ID dinámico
+        # Usamos stream=True para manejar el archivo de forma eficiente
+        backend_url = f"{API_BASE_URL}/generate-report/{snapshot_id}"
+        response = requests.get(backend_url, stream=True)
+        
+        if response.status_code == 200:
+            # 3. Reenviamos el contenido del PDF al navegador del usuario
+            # Usamos StreamingResponse para que la descarga sea fluida
+            return StreamingResponse(
+                response.iter_content(chunk_size=4096),
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename=Auditoria_PgGuardian_{snapshot_id}.pdf"
+                }
+            )
+        else:
+            # Si el backend falla, devolvemos el error que mande el back
+            return {"status": "error", "message": f"El backend falló con código: {response.status_code}"}
+            
+    except Exception as e:
+        # Error si el backend está apagado o no hay red
+        return {"status": "error", "message": f"Error de conexión con el servidor: {str(e)}"}
 
 
 if __name__ == "__main__":

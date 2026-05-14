@@ -7,5 +7,5 @@ jinja2==3.1.4
 pydantic==2.7.1  # para formato
 pydantic-settings==2.2.1 # observar si la config esd
 sqlalchemy==2.0.30 
-fpdf2==2.7.8 # pdf
-sqlalchemy==2.0.30 # para el ORM de la BD de los snapshots y hallazgos
+reportlab==4.2.0
+

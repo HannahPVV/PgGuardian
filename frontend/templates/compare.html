@@ -76,9 +76,16 @@
 </div>
 
 <div class="text-center">
-    <button class="text-[10px] uppercase tracking-[0.4em] text-slate-500 hover:text-white transition-all border border-white/10 px-10 py-4 rounded-full hover:bg-white/5">
-        Exportar Reporte Ejecutivo PDF
-    </button>
+    {% if id_actual %}
+        <a href="/download-report/{{ id_actual }}" 
+           class="inline-block text-[10px] uppercase tracking-[0.4em] text-slate-500 hover:text-white transition-all border border-white/10 px-10 py-4 rounded-full hover:bg-white/5 no-underline">
+            Exportar Reporte Ejecutivo PDF del Snapshot Actual
+        </a>
+    {% else %}
+        <p class="text-[10px] uppercase tracking-widest text-magenta-500/50">
+            Selecciona un snapshot para habilitar el reporte
+        </p>
+    {% endif %}
 </div>
 
 <script>

@@ -95,49 +95,63 @@ async def report(request: Request):
     })
 
 
+@app.get("/report", response_class=HTMLResponse)
+async def report(request: Request):
+    findings = []
+    snap_id = get_latest_snapshot_id()
+    if snap_id:
+        try:
+            res = requests.get(f"{API_BASE_URL}/report/{snap_id}")
+            if res.status_code == 200:
+                findings = res.json()
+        except Exception as e:
+            print(f"Error cargando reportes: {e}")
+            
+    return templates.TemplateResponse("report.html", {
+        "request": request,
+        "findings": findings
+    })
+
+
 @app.get("/compare", response_class=HTMLResponse)
 async def compare(request: Request, base_id: Optional[str] = None, actual_id: Optional[str] = None):
     lista_final = []
     mejora, resueltos, ahorro = 0, 0, 0
+    hallazgos_solucionados = [] 
     
-    # 1. Convertimos a entero de forma segura
+    # Convertimos de forma segura a entero los strings que vienen del formulario HTML
     b_id = int(base_id) if base_id and base_id.isdigit() else None
     a_id = int(actual_id) if actual_id and actual_id.isdigit() else None
     
     try:
-        # 2. Siempre cargamos la lista para los selectores del HTML
+        # Siempre cargamos la lista completa para llenar los selectores <select> del HTML
         response = requests.get(f"{API_BASE_URL}/snapshots")
         if response.status_code == 200:
             lista_final = response.json()
         
-        # 3. Solo si tenemos ambos IDs calculamos la comparación
+        # Si el usuario ya seleccionó tanto el snapshot viejo como el nuevo en la interfaz:
         if b_id and a_id:
-            # Pedimos los resúmenes al backend usando los IDs numéricos
-            res_1 = requests.get(f"{API_BASE_URL}/summary/{b_id}")
-            res_2 = requests.get(f"{API_BASE_URL}/summary/{a_id}")
+            # Construimos la URL enviando los dos parámetros de forma dinámica por Query String (?base_id=...&actual_id=...)
+            comp_response = requests.get(f"{API_BASE_URL}/compare?base_id={b_id}&actual_id={a_id}")
             
-            if res_1.status_code == 200 and res_2.status_code == 200:
-                data_1 = res_1.json()
-                data_2 = res_2.json()
+            if comp_response.status_code == 200:
+                comp_data = comp_response.json()
                 
-                # Sumamos hallazgos (Críticos + Medios)
-                total_1 = data_1.get('total_high', 0) + data_1.get('total_medium', 0)
-                total_2 = data_2.get('total_high', 0) + data_2.get('total_medium', 0)
+                # Extraemos el contador y los objetos serializados detallados
+                resueltos = comp_data.get('fixed_count', 0)
+                hallazgos_solucionados = comp_data.get('hallazgos_solucionados', [])
                 
-                # Lógica de mejora
-                resueltos = max(0, total_1 - total_2)
-                if total_1 > 0:
-                    mejora = min(100, int((resueltos / total_1) * 100))
-                elif total_1 == 0 and total_2 == 0:
-                    mejora = 0 # No hay problemas, no hay mejora que medir
+                # Métricas visuales de tus KPIs inventados para mostrar en el frontend
+                ahorro = resueltos * 150 
+                if resueltos > 0:
+                    mejora = min(100, resueltos * 10) 
                 
-                ahorro = resueltos * 150 # Dato ficticio para el KPI
-                print(f"Comparación exitosa: {b_id} vs {a_id}")
+                print(f"Comparación e inyección exitosa en Front: {b_id} vs {a_id}")
 
     except Exception as e:
-        print(f"HUBO UN PROBLEMA EN COMPARE: {e}")
+        print(f"HUBO UN PROBLEMA EN EL FRONTEND (COMPARE): {e}")
 
-    # 4. Retornamos al template (pasamos los IDs originales para que el HTML sepa cuál seleccionar)
+    # Renderizamos la plantilla HTML inyectando la variable exacta que Jinja2 va a recorrer
     return templates.TemplateResponse("compare.html", {
         "request": request,
         "snapshots": lista_final, 
@@ -145,18 +159,11 @@ async def compare(request: Request, base_id: Optional[str] = None, actual_id: Op
         "id_actual": a_id,
         "puntos_mejorados": mejora,
         "resueltos": resueltos,
-        "ahorro": ahorro
+        "ahorro": ahorro,
+        "hallazgos_solucionados": hallazgos_solucionados 
     })
-    
-    return templates.TemplateResponse("compare.html", {
-        "request": request,
-        "snapshots": lista_final, 
-        "id_base": base_id,
-        "id_actual": actual_id,
-        "puntos_mejorados": mejora,
-        "resueltos": resueltos,
-        "ahorro": ahorro
-    })
+
+
 
 @app.post("/run-audit")
 async def run_audit():

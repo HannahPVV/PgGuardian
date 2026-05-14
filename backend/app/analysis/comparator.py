@@ -4,43 +4,42 @@ class SnapshotComparator:
     def __init__(self, session):
         self.session = session
 
-    def compare(self, current_snap_id):
-        
-        #Compara los hallazgos del snapshot actual contra el anterior.
-        # Retorna un resumen de qué es nuevo y qué se solucionó.
+    def _fingerprint(self, finding):
+        return (finding.problem_code, finding.table_name or "")
 
-        # 1. Buscamos el snapshot actual
+    def compare(self, base_snap_id, current_snap_id):
+        # Buscamos los dos snapshots
+        previous_snap = self.session.query(SnapshotRecord).get(base_snap_id)
         current_snap = self.session.query(SnapshotRecord).get(current_snap_id)
-        if not current_snap:
-            return None
+        
+        if not previous_snap or not current_snap:
+            return None #  si los IDs no existen
 
-        # 2. Buscamos el snapshot anterior de la misma base de datos
-        previous_snap = self.session.query(SnapshotRecord)\
-            .filter(SnapshotRecord.id < current_snap_id, 
-                    SnapshotRecord.db_name == current_snap.db_name)\
-            .order_by(SnapshotRecord.id.desc())\
-            .first()
+        
+        current_fps = {self._fingerprint(f): f for f in current_snap.findings}
+        previous_fps = {self._fingerprint(f): f for f in previous_snap.findings}
 
-        if not previous_snap:
+        fixed_keys = set(previous_fps) - set(current_fps)
+        new_keys = set(current_fps) - set(previous_fps)
+        persistent_keys = set(current_fps) & set(previous_fps)
+
+        def serialize(f):
             return {
-                "status": "first_run",
-                "message": "Primera auditoría realizada. No hay historial para comparar.",
-                "new_count": len(current_snap.findings),
-                "fixed_count": 0
+                "problem_code": f.problem_code,
+                "table_name": f.table_name,
+                "title": f.title,
+                "severity": f.severity,
+                "description": getattr(f, 'description', 'Sin descripción')
             }
 
-        # 3. Lógica de comparación de códigos de error
-        current_codes = {f.problem_code for f in current_snap.findings}
-        previous_codes = {f.problem_code for f in previous_snap.findings}
-
-        new_issues = current_codes - previous_codes
-        fixed_issues = previous_codes - current_codes
+        hallazgos_solucionados = [serialize(previous_fps[fp]) for fp in fixed_keys]
 
         return {
             "status": "compared",
             "timestamp": current_snap.taken_at,
-            "previous_timestamp": previous_snap.taken_at,
-            "new_count": len(new_issues),
-            "fixed_count": len(fixed_issues),
-            "summary": f"Se encontraron {len(new_issues)} problemas nuevos y se solucionaron {len(fixed_issues)} desde la última revisión."
+            "previous_timestamp": previous_snap.at if hasattr(previous_snap, 'at') else None,
+            "new_count": len(new_keys),
+            "fixed_count": len(fixed_keys),
+            "summary": f"Se solucionaron {len(fixed_keys)} problemas.",
+            "hallazgos_solucionados": hallazgos_solucionados
         }

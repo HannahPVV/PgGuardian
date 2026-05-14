@@ -76,20 +76,27 @@ def get_summary(snapshot_id: int):
     finally:
         session.close()
 
-@router.get("/compare/{snapshot_id}")
-def get_comparison(snapshot_id: int):
+@router.get("/compare")
+def get_comparison(base_id: int = None, actual_id: int = None):
     """
-    Endpoint para la Persona 4: Compara el snapshot actual con el anterior
-    para ver la evolución de la salud de la base de datos.
+    Endpoint puro de API (Backend): Recibe los dos IDs desde el Frontend
+    y retorna los datos limpios en formato JSON sin lógica de vistas.
     """
+    if not base_id or not actual_id:
+        raise HTTPException(status_code=400, detail="Faltan parámetros de comparación (base_id y actual_id)")
+
     session = get_session()
     try:
         comparator = SnapshotComparator(session)
-        result = comparator.compare(snapshot_id)
+        # Invocamos el método con las dos variables exactas que requiere
+        result = comparator.compare(base_id, actual_id)
         
         if not result:
             raise HTTPException(status_code=404, detail="No se pudo realizar la comparación")
             
         return result
+    except Exception as e:
+        print(f"ERROR EN COMPARACIÓN API (BACKEND): {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         session.close()

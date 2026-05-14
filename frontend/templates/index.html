@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-[80vh] flex flex-col items-center justify-center text-center">
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-magenta-500/10 blur-[120px] rounded-full -z-10"></div>
+
+    <p class="text-magenta-400 tracking-[0.8em] uppercase text-[10px] mb-4 animate-pulse">
+        Know your database health in real time 
+    </p>
+    
+    <h1 class="tech-font text-7xl md:text-8xl font-black mb-8 tracking-tighter">
+        Pulse<span class="text-magenta-500">DB</span>
+    </h1>
+
+    <p class="max-w-2xl text-slate-400 text-lg mb-12 leading-relaxed">
+        Auditoría de integridad y diagnóstico profundo para bases de datos PostgreSQL. 
+        Optimiza el rendimiento, elimina redundancias y protege tus activos digitales.
+    </p>
+
+    <div class="flex gap-6">
+        <a href="/dashboard" class="glass-card px-10 py-5 border-magenta-500/50 hover:bg-magenta-500/20 transition-all group">
+            <span class="tech-font text-sm tracking-widest uppercase flex items-center gap-3">
+                Iniciar Sistema <span class="group-hover:translate-x-2 transition-transform">→</span>
+            </span>
+        </a>
+    </div>
+
+    <div class="grid grid-cols-3 gap-12 mt-24 opacity-50 text-[10px] uppercase tracking-[0.2em]">
+        <div>Detección de Índices</div>
+        <div>Análisis de Salud</div>
+        <div>Ahorro de Costos</div>
+    </div>
+</div>
+{% endblock %}

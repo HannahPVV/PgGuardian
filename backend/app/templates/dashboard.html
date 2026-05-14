@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Contenedor principal centrado verticalmente -->
+<div class="min-h-[75vh] flex flex-col justify-center">
+
+    <!-- Header -->
+    <div class="text-center mb-24">
+
+        <p class="text-[10px] uppercase tracking-[0.5em] text-magenta-400 mb-3">
+            Database Integrity System
+        </p>
+
+        <h1 class="tech-font text-6xl md:text-7xl font-bold mb-6">
+            STATUS
+        </h1>
+
+        <div class="w-40 h-1 bg-magenta-500 mx-auto rounded-full shadow-[0_0_15px_#d946ef]"></div>
+
+    </div>
+
+    <!-- Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+        <!-- Card 1 -->
+        <div class="glass-card p-8 text-center">
+            <p class="text-[9px] uppercase text-slate-500 mb-3 tracking-widest">
+                Hallazgos Totales
+            </p>
+
+            <h3 class="text-5xl font-bold text-white">
+                {{ total_findings }}
+            </h3>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="glass-card p-8 text-center border-magenta-500/20">
+            <p class="text-[9px] uppercase text-slate-500 mb-3 tracking-widest">
+                Salud Global
+            </p>
+
+            <h3 class="text-5xl font-bold text-magenta-400">
+                {{ health_score }}%
+            </h3>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="glass-card p-8 text-center">
+            <p class="text-[9px] uppercase text-slate-500 mb-3 tracking-widest">
+                Códigos Únicos
+            </p>
+
+            <h3 class="text-5xl font-bold text-white">
+                {{ unique_types }}
+            </h3>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="glass-card p-8 text-center border-white/5">
+            <p class="text-[9px] uppercase text-slate-500 mb-3 tracking-widest">
+                Instancia
+            </p>
+
+            <h3 class="text-xl font-semibold mt-3 text-white">
+                {{ db_name }}
+            </h3>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

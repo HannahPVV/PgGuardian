@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Comparar Snapshots | PgGuardian{% endblock %}
+
+{% block content %}
+<div class="mb-12 animate-in fade-in duration-500">
+    <p class="text-magenta-400 text-[10px] uppercase tracking-widest mb-2">Análisis Comparativo</p>
+    <h1 class="tech-font text-4xl font-bold uppercase">Historial de Salud</h1>
+</div>
+
+<form action="/compare" method="get">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        <div class="glass-card p-6 border-white/5 bg-white/[0.02]">
+            <p class="text-[9px] uppercase text-slate-500 block mb-4 tracking-widest">Snapshot Base (Origen)</p>
+            <div class="bg-black/40 p-4 rounded-xl border border-white/5">
+                <select name="base_id" onchange="this.form.submit()" class="w-full bg-transparent text-white text-sm font-bold outline-none cursor-pointer appearance-none">
+                    <option value="" class="bg-[#0b0b0f]">-- Seleccionar Snapshot --</option>
+                    {% for snap in snapshots %}
+                        <option value="{{ snap.id }}" class="bg-[#0b0b0f] text-white" {% if id_base|string == snap.id|string %}selected{% endif %}>
+                            ID: {{ snap.id }} | {{ snap.db_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="glass-card p-6 border-magenta-500/30 bg-magenta-500/[0.02]">
+            <p class="text-[9px] uppercase text-slate-500 block mb-4 tracking-widest">Snapshot Destino (Actual)</p>
+            <div class="bg-magenta-500/10 p-4 rounded-xl border border-magenta-500/30">
+                <select name="actual_id" onchange="this.form.submit()" class="w-full bg-transparent text-white text-sm font-bold outline-none cursor-pointer appearance-none">
+                    <option value="" class="bg-[#0b0b0f]">-- Seleccionar Snapshot --</option>
+                    {% for snap in snapshots %}
+                        <option value="{{ snap.id }}" class="bg-[#0b0b0f] text-white" {% if id_actual|string == snap.id|string %}selected{% endif %}>
+                            ID: {{ snap.id }} | {{ snap.db_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="glass-card p-12 mb-12 relative overflow-hidden bg-gradient-to-br from-white/[0.02] to-transparent">
+    <div class="absolute top-0 right-0 p-8 opacity-10">
+        <svg width="150" height="150" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+    </div>
+    
+    <div class="relative z-10">
+        <h2 class="tech-font text-2xl mb-8">MEJORA DEL RENDIMIENTO: <span class="text-magenta-400">+{{ puntos_mejorados }}%</span></h2>
+        
+        <div class="space-y-6">
+            <div>
+                <div class="flex justify-between text-[10px] uppercase mb-2 tracking-widest text-slate-400">
+                    <span>Reducción de Riesgo Crítico</span>
+                    <span class="text-magenta-400">Optimizado</span>
+                </div>
+                <div class="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="h-full bg-magenta-500 shadow-[0_0_10px_#d946ef] transition-all duration-1000" style="width: 0%" data-width="{{ puntos_mejorados }}"></div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 pt-4">
+                <div class="p-6 bg-black/20 rounded-lg border border-white/5 text-center">
+                    <p class="text-[9px] uppercase text-slate-500 mb-1">Hallazgos Resueltos</p>
+                    <p class="text-3xl font-bold text-magenta-400">{{ resueltos }}</p>
+                </div>
+                <div class="p-6 bg-black/20 rounded-lg border border-white/5 text-center">
+                    <p class="text-[9px] uppercase text-slate-500 mb-1">Ahorro Estimado</p>
+                    <p class="text-3xl font-bold text-green-400">${{ ahorro }} <span class="text-xs">USD</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="text-center">
+    <button class="text-[10px] uppercase tracking-[0.4em] text-slate-500 hover:text-white transition-all border border-white/10 px-10 py-4 rounded-full hover:bg-white/5">
+        Exportar Reporte Ejecutivo PDF
+    </button>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const bar = document.getElementById("progress-bar");
+        if (bar) {
+            setTimeout(() => {
+                const targetWidth = bar.getAttribute("data-width");
+                bar.style.width = targetWidth + "%";
+            }, 300);
+        }
+    });
+</script>
+{% endblock %}

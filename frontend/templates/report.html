@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="glass-card overflow-hidden">
+
+    {% for f in findings %}
+
+    <div class="border-b border-white/5 p-6 flex items-center gap-6 hover:bg-white/5 transition-all group">
+
+        <!-- Código -->
+        <div class="min-w-[90px]">
+            <span class="block text-xs font-bold tech-font
+                {% if f.severity == 'high' %}
+                    text-red-500
+                {% else %}
+                    text-magenta-500
+                {% endif %}">
+                {{ f.problem_code or 'H-00' }}
+            </span>
+        </div>
+
+        <!-- Información -->
+        <div class="flex-grow min-w-0">
+            <h4 class="text-base font-semibold leading-tight break-words">
+                {{ f.title }}
+            </h4>
+
+            <p class="text-[9px] text-magenta-300/50 mt-1 uppercase tracking-wider">
+                Objeto: {{ f.table_name or 'Global' }}
+            </p>
+        </div>
+
+        <!-- Botón -->
+        <button 
+            data-title="{{ f.title }}"
+            data-desc="{{ f.description or 'Se requiere revisión técnica. El motor de PgGuardian ha detectado una anomalía en este componente.' }}"
+            data-evidence="{{ f.evidence_sql or '-- El motor no registró la query de evidencia para este hallazgo --' }}"
+            data-fix="{{ f.fix_sql or '-- Consultar con el DBA para determinar el plan de acción --' }}"
+            onclick="showDiagnostic(this)"
+            class="shrink-0 text-[9px] uppercase border border-magenta-500/30 px-6 py-2 rounded-full hover:bg-magenta-500 hover:border-magenta-500 transition-all font-bold">
+            Diagnóstico
+        </button>
+
+    </div>
+
+    {% else %}
+
+    <div class="p-20 text-center opacity-30">
+        <p class="tech-font text-xs">
+            SISTEMA CONECTADO. ESPERANDO DATOS DEL API.
+        </p>
+    </div>
+
+    {% endfor %}
+
+</div>
+
+<!-- Modal -->
+<div id="diagModal"
+     class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
+
+    <div class="glass-card max-w-2xl w-full p-10 border-magenta-500/50 shadow-[0_0_60px_rgba(217,70,239,0.3)] animate-in zoom-in-95 duration-300">
+
+        <!-- Header -->
+        <div class="flex justify-between items-start mb-6">
+            <h3 id="modalTitle" class="text-2xl font-bold">
+                Título
+            </h3>
+
+            <button onclick="closeModal()"
+                    class="text-slate-500 hover:text-white text-3xl leading-none">
+                &times;
+            </button>
+        </div>
+
+        <!-- Content -->
+        <div class="space-y-6 text-sm">
+
+            <!-- Contexto -->
+            <div>
+                <p class="text-[10px] uppercase text-slate-500 mb-2 tracking-[0.2em]">
+                    Contexto Técnico
+                </p>
+
+                <p id="modalDesc"
+                   class="text-slate-300 leading-relaxed font-light">
+                </p>
+            </div>
+
+            <!-- Evidencia -->
+            <div>
+                <p class="text-[10px] uppercase text-amber-500 mb-2 tracking-[0.2em]">
+                    Evidencia (SQL Detectado)
+                </p>
+
+                <pre class="bg-black/60 p-4 rounded-lg border border-white/5 font-mono text-[11px] text-amber-200 overflow-x-auto">
+<code id="modalEvidence"></code>
+                </pre>
+            </div>
+
+            <!-- Fix -->
+            <div>
+                <p class="text-[10px] uppercase text-green-500 mb-2 tracking-[0.2em]">
+                    Acción Recomendada (SQL FIX)
+                </p>
+
+                <pre class="bg-black/40 p-4 rounded-lg border border-white/10 font-mono text-[11px] text-green-400 overflow-x-auto">
+<code id="modalRec"></code>
+                </pre>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <button onclick="closeModal()"
+                class="w-full mt-8 py-3 bg-magenta-600 hover:bg-magenta-500 rounded-full text-[10px] uppercase font-bold tracking-widest transition-all">
+            Cerrar
+        </button>
+
+    </div>
+</div>
+
+<script>
+
+function showDiagnostic(btn) {
+
+    document.getElementById('modalTitle').innerText =
+        btn.getAttribute('data-title');
+
+    document.getElementById('modalDesc').innerText =
+        btn.getAttribute('data-desc');
+
+    document.getElementById('modalEvidence').innerText =
+        btn.getAttribute('data-evidence');
+
+    document.getElementById('modalRec').innerText =
+        btn.getAttribute('data-fix');
+
+    document.getElementById('diagModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('diagModal').classList.add('hidden');
+}
+
+</script>
+
+{% endblock %}

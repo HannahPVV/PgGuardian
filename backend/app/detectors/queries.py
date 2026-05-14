@@ -1,4 +1,4 @@
-from app.detectors.base import Detector
+from detectors.base import Detector
 
 
 class TopQueriesDetector(Detector):
@@ -59,7 +59,7 @@ class TopQueriesDetector(Detector):
                 )
 
             # LIKE con comodín inicial evita uso normal de índices B-Tree.
-            if "like '%" in query_lower:
+            if "like '%" in query_lower or "like $1" in query_lower:
                 issues.append(
                     self._add_issue(
                         code="PRF002",
@@ -73,7 +73,7 @@ class TopQueriesDetector(Detector):
                         sql_check=(
                             "SELECT query "
                             "FROM pg_stat_statements "
-                            "WHERE query ILIKE '%LIKE ''''%%';"
+                            "WHERE query ILIKE '%LIKE ''''%%' OR query ILIKE '%LIKE ''$1''%';"
                         ),
                         sql_fix=(
                             "-- Considerar búsqueda de texto completo con tsvector "
@@ -131,28 +131,5 @@ class TopQueriesDetector(Detector):
                     )
                 )
 
-            # Pocas llamadas con mucho tiempo puede indicar query muy pesada.
-            if calls < 10 and total_time > 2000:
-                issues.append(
-                    self._add_issue(
-                        code="PRF005",
-                        level="medium",
-                        title="Query poco frecuente pero muy costosa",
-                        desc=(
-                            f"La consulta tiene solo {calls} llamadas, pero acumuló "
-                            f"{total_time:.2f} ms. Puede ser una query pesada o mal optimizada."
-                        ),
-                        table="",
-                        sql_check=(
-                            "SELECT query, calls, total_exec_time "
-                            "FROM pg_stat_statements "
-                            "WHERE calls < 10 "
-                            "ORDER BY total_exec_time DESC;"
-                        ),
-                        sql_fix=(
-                            "-- Ejecutar ANALYZE y revisar el plan con EXPLAIN ANALYZE."
-                        )
-                    )
-                )
-
+            
         return issues

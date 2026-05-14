@@ -17,7 +17,6 @@ class Snapshot:
         self.constraint_indexes = constraint_indexes
         self.column_stats = column_stats
         self.refresh_statistics = refresh_statistics
-        
 
 
 def take_snapshot():
@@ -170,7 +169,7 @@ def _get_statement_stats():
     #anlisis de las consultas más lentas para detectar posibles optimizaciones
     try:
         return db_client.execute_query("""
-            SELECT query, calls, total_exec_time, mean_exec_time
+            SELECT query, calls, total_exec_time, mean_exec_time, temp_blks_written
             FROM pg_stat_statements 
             ORDER BY mean_exec_time DESC LIMIT 10
         """)
@@ -225,4 +224,6 @@ def _get_column_stats():
         )
         WHERE s.schemaname = 'public' AND s.most_common_freqs IS NOT NULL;
     """)
+
+
 

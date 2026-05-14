@@ -31,6 +31,10 @@ def get_latest_snapshot_id():
     return None
 
 @app.get("/")
+@app.get("/", response_class=HTMLResponse)
+async def landing(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     total, uniques, salud = 0, 0, 100

@@ -15,7 +15,8 @@ templates = Jinja2Templates(directory=os.path.join(base_path, "templates"))
 if os.path.exists(os.path.join(base_path, "static")):
     app.mount("/static", StaticFiles(directory=os.path.join(base_path, "static")), name="static")
 
-API_BASE_URL = "http://localhost:8000/api"
+
+API_BASE_URL = "http://pgguardian_backend:8000/api"
 
 def get_latest_snapshot_id():
     try:
@@ -133,6 +134,19 @@ async def compare(request: Request, base_id: int = None, actual_id: int = None):
         "resueltos": resueltos,
         "ahorro": ahorro
     })
+
+@app.post("/run-audit")
+async def run_audit():
+    try:
+        # Le pedimos al backend real que haga el snapshot
+        response = requests.post(f"{API_BASE_URL}/snapshot")
+        if response.status_code == 200:
+            return {"status": "success", "snapshot_id": response.json().get("id")}
+        return {"status": "error", "message": "No se pudo crear el snapshot"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 
 
 if __name__ == "__main__":

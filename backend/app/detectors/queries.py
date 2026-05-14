@@ -1,6 +1,6 @@
 import re
 
-from app.detectors.base import Detector
+from detectors.base import Detector
 
 
 class TopQueriesDetector(Detector):

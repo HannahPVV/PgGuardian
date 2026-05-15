@@ -64,5 +64,7 @@ docker stop proyecto-db
 docker compose up --build
 
 
+1. Link del video demo
+https://youtu.be/YEtZqqHPM8E?si=VMHIfVTyW-zGOpkx
 
 
